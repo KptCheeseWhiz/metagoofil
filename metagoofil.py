@@ -25,28 +25,29 @@ __version__ = "1.2.0"
 
 
 class DownloadWorker(threading.Thread):
-    def __init__(self):
+    def __init__(self, mg):
+        self.mg = mg
         threading.Thread.__init__(self)
 
     def run(self):
         while True:
             # Grab URL off the queue.
-            url = mg.queue.get()
+            url = self.mg.queue.get()
 
             try:
                 headers = {}
 
                 # Assign a User-Agent for each file request.
                 # No -u
-                if mg.user_agent == "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)":
+                if self.mg.user_agent == "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)":
                     headers["User-Agent"] = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
                 # -u
-                elif mg.user_agent is None:
+                elif self.mg.user_agent is None:
                     user_agent_choice = random.choice(mg.random_user_agents).strip()
                     headers["User-Agent"] = f"{user_agent_choice}"
                 # -u "My custom user agent 2.0"
                 else:
-                    headers["User-Agent"] = mg.user_agent
+                    headers["User-Agent"] = self.mg.user_agent
 
                 response = requests.get(
                     url,
@@ -68,7 +69,7 @@ class DownloadWorker(threading.Thread):
                         )
                         size = len(response.content)
 
-                    mg.total_bytes += size
+                    self.mg.total_bytes += size
 
                     # Strip any trailing /'s before extracting file name.  Use response.url in case there were HTTP
                     # 301/302 redirects.
@@ -91,7 +92,7 @@ class DownloadWorker(threading.Thread):
             except requests.exceptions.RequestException as e:
                 print(f"[-] Exception for url: {url} -- {e}")
 
-            mg.queue.task_done()
+            self.mg.queue.task_done()
 
 
 class Metagoofil:
@@ -137,7 +138,7 @@ class Metagoofil:
     def go(self):
         # Kickoff the threadpool.
         for i in range(self.number_of_threads):
-            thread = DownloadWorker()
+            thread = DownloadWorker(self)
             thread.daemon = True
             thread.start()
 
@@ -261,7 +262,7 @@ def positive_float(value):
         raise argparse.ArgumentTypeError(f"invalid value '{value}', must be a float >= 0")
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description=f"Metagoofil v{__version__} - Search Google and download specific file types.",
         formatter_class=SmartFormatter,
@@ -381,3 +382,6 @@ if __name__ == "__main__":
     mg.go()
 
     print("[+] Done!")
+
+if __name__ == "__main__":
+    main()
